@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Futuristic NEXORA "N" Monogram with angled facets -->
+    <!-- Left vertical bar -->
+    <path
+        android:pathData="M 32,32 L 42,32 L 42,76 L 32,76 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="32"
+                android:startY="32"
+                android:endX="42"
+                android:endY="76"
+                android:type="linear">
+                <item android:color="#38BDF8" android:offset="0.0" />
+                <item android:color="#6366F1" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Right vertical bar -->
+    <path
+        android:pathData="M 66,32 L 76,32 L 76,76 L 66,76 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="66"
+                android:startY="32"
+                android:endX="76"
+                android:endY="76"
+                android:type="linear">
+                <item android:color="#6366F1" android:offset="0.0" />
+                <item android:color="#A855F7" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Diagonal dynamic slash connecting the bars -->
+    <path
+        android:pathData="M 37,32 L 47,32 L 71,76 L 61,76 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="37"
+                android:startY="32"
+                android:endX="71"
+                android:endY="76"
+                android:type="linear">
+                <item android:color="#22D3EE" android:offset="0.0" />
+                <item android:color="#818CF8" android:offset="0.5" />
+                <item android:color="#C084FC" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Accent core gem -->
+    <path
+        android:pathData="M 50,49 L 58,49 L 54,58 Z"
+        android:fillColor="#E0E7FF" />
+</vector>

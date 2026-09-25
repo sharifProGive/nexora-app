@@ -1,0 +1,8 @@
+{
+  "name": "NEXORA",
+  "description": "NEXORA Video & Social Platform: personal profiles, dedicated video channels, creator upload studio, friends & messaging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
