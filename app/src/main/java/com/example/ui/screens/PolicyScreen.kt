@@ -96,7 +96,7 @@ fun PolicyScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "NEXORA Rules & Guidelines",
+                    text = "nexora Rules & Guidelines",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = NexoraTextPrimary
                 )
@@ -104,7 +104,7 @@ fun PolicyScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Please read and acknowledge the fundamental NEXORA platform policies before continuing account creation.",
+                    text = "Please read and acknowledge the fundamental nexora platform policies before continuing account creation.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = NexoraTextSecondary
                 )
@@ -115,7 +115,7 @@ fun PolicyScreen(
                 PolicyItemCard(
                     icon = Icons.Default.Gavel,
                     title = "1. Community Guidelines & Safety",
-                    description = "NEXORA maintains high standards for community respect. Harassment, hateful conduct, illegal media, and deceptive impersonation result in immediate account termination."
+                    description = "nexora maintains high standards for community respect. Harassment, hateful conduct, illegal media, and deceptive impersonation result in immediate account termination."
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -124,7 +124,7 @@ fun PolicyScreen(
                 PolicyItemCard(
                     icon = Icons.Default.Hub,
                     title = "2. Personal Profile vs Video Channels",
-                    description = "Your NEXORA Personal Profile is your permanent account identity. Creating separate Video Channels (now or later) never deletes or replaces your Personal Profile. Both entities remain distinct."
+                    description = "Your nexora Personal Profile is your permanent account identity. Creating separate Video Channels (now or later) never deletes or replaces your Personal Profile. Both entities remain distinct."
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -133,7 +133,7 @@ fun PolicyScreen(
                 PolicyItemCard(
                     icon = Icons.Default.Security,
                     title = "3. Zero Plaintext Password Storage",
-                    description = "Passwords are cryptographically salted and hashed using PBKDF2 (10,000 rounds). NEXORA will never request your Google or external email passwords. You control Public or Private profile discoverability."
+                    description = "Passwords are cryptographically salted and hashed using PBKDF2 (10,000 rounds). nexora will never request your Google or external email passwords. You control Public or Private profile discoverability."
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -172,7 +172,7 @@ fun PolicyScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "I have read and agree to the NEXORA Terms of Service, Community Guidelines, and Privacy Policy.",
+                            text = "I have read and agree to the nexora Terms of Service, Community Guidelines, and Privacy Policy.",
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                             color = NexoraTextPrimary
                         )
@@ -184,7 +184,7 @@ fun PolicyScreen(
 
             Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
                 NexoraPrimaryButton(
-                    text = "I Agree & Continue",
+                    text = "Next",
                     enabled = hasAgreed,
                     testTag = "btn_agree_and_continue",
                     onClick = onAgreeAndContinue

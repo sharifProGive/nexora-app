@@ -115,11 +115,6 @@ fun LoginScreen(
                             onClick = {
                                 selectedTab = index
                                 localError = null
-                                // Auto-fill sample for quick test if desired
-                                if (index == 0 && identifierInput.isBlank()) {
-                                    identifierInput = "sharif.sample@nexora.io"
-                                    passwordInput = "Nexora2026!"
-                                }
                             },
                             text = {
                                 Text(
@@ -144,7 +139,7 @@ fun LoginScreen(
                                 localError = null
                             },
                             label = "Registered Email",
-                            placeholder = "e.g. sharif.sample@nexora.io",
+                            placeholder = "Enter your registered email",
                             leadingIcon = Icons.Default.Email,
                             keyboardType = KeyboardType.Email,
                             testTag = "login_email_input"
@@ -158,7 +153,7 @@ fun LoginScreen(
                                 localError = null
                             },
                             label = "Registered Phone Number",
-                            placeholder = "+1 555 123 4567",
+                            placeholder = "Enter phone number with country code (e.g. +91)",
                             leadingIcon = Icons.Default.Phone,
                             keyboardType = KeyboardType.Phone,
                             testTag = "login_phone_input"
@@ -172,7 +167,7 @@ fun LoginScreen(
                                 localError = null
                             },
                             label = "Registered Google Account Email",
-                            placeholder = "e.g. sharif.official@gmail.com",
+                            placeholder = "Enter registered Google account email",
                             leadingIcon = Icons.Default.Email,
                             keyboardType = KeyboardType.Email,
                             testTag = "login_google_email_input"

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -66,7 +67,8 @@ fun PlusCreateModal(
     onNavigateToCreateShort: () -> Unit = {},
     onNavigateToCreateLongVideo: () -> Unit = {},
     onNavigateToCreatePost: () -> Unit = {},
-    onNavigateToCreatePoll: () -> Unit = {}
+    onNavigateToCreatePoll: () -> Unit = {},
+    onOpenUploadManager: () -> Unit = {}
 ) {
     var showLiveLockedDialog by remember { mutableStateOf(false) }
 
@@ -92,7 +94,7 @@ fun PlusCreateModal(
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             Text(
-                text = if (!user.hasChannel) "Create on NEXORA" else "CREATE",
+                text = if (!user.hasChannel) "Create on nexora" else "CREATE",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = NexoraTextPrimary
             )
@@ -297,6 +299,23 @@ fun PlusCreateModal(
                         onNavigateToCreatePost()
                     },
                     testTag = "btn_create_post_option"
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+                HorizontalDivider(color = NexoraSurfaceBorder.copy(alpha = 0.6f))
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // 6. UPLOAD MANAGER
+                CreateActionRow(
+                    icon = Icons.Default.Upload,
+                    title = "UPLOAD MANAGER",
+                    subtitle = "View active transfers, retry failed uploads, and preferences",
+                    enabled = true,
+                    onClick = {
+                        onDismiss()
+                        onOpenUploadManager()
+                    },
+                    testTag = "btn_create_upload_manager_option"
                 )
             }
 

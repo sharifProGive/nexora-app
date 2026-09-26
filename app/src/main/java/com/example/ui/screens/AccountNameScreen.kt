@@ -110,7 +110,7 @@ fun AccountNameScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Account Name = Main Personal Profile Name (e.g. Sharif). This represents your master account. Video Channels are created separately.",
+                    text = "Account Name = Main Personal Profile Name. This represents your master account. Video Channels are created separately.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = NexoraTextSecondary
                 )
@@ -125,7 +125,7 @@ fun AccountNameScreen(
                         onNameChanged(it)
                     },
                     label = "Account / Personal Profile Name",
-                    placeholder = "e.g. Sharif",
+                    placeholder = "Enter your profile name",
                     leadingIcon = Icons.Default.Person,
                     isError = isAvailable == false || errorMessage != null || localError != null,
                     errorMessage = localError ?: (if (isAvailable == false) validationMessage else errorMessage),
@@ -216,7 +216,7 @@ fun AccountNameScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        val previewName = nameInput.trim().ifEmpty { "Sharif" }
+                        val previewName = nameInput.trim().ifEmpty { "Your Profile" }
                         Text(
                             text = "Personal Profile: $previewName",
                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),

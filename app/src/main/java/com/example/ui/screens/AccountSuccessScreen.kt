@@ -154,13 +154,13 @@ fun AccountSuccessScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Text(
-                            text = user?.name ?: "Sharif",
+                            text = user?.name ?: "Personal Profile",
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = NexoraTextPrimary
                         )
 
                         Text(
-                            text = user?.handle ?: "@sharif",
+                            text = user?.handle ?: "",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = NexoraCyanAccent
                         )

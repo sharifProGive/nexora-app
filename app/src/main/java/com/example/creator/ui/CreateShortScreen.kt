@@ -83,6 +83,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -107,6 +108,11 @@ import com.example.ui.theme.NexoraTextMuted
 import com.example.ui.theme.NexoraTextPrimary
 import com.example.ui.theme.NexoraTextSecondary
 import com.example.ui.theme.NexoraVioletAccent
+import com.example.upload.model.UploadTargetType
+import com.example.upload.model.UploadTask
+import com.example.upload.service.UploadManager
+import com.example.upload.ui.CentralizedUploadHost
+import com.example.upload.ui.rememberCentralizedUploadController
 import kotlinx.coroutines.delay
 import java.util.UUID
 
@@ -130,6 +136,10 @@ fun CreateShortScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val channel = uiState.channel
+
+    val context = LocalContext.current
+    val uploadManager = remember { UploadManager.getInstance(context) }
+    val uploadController = rememberCentralizedUploadController()
 
     var currentStep by remember {
         mutableStateOf(if (initialDraft != null) ShortCreationStep.DETAILS else ShortCreationStep.SOURCE_SELECTION)
@@ -313,8 +323,11 @@ fun CreateShortScreen(
                         currentStep = ShortCreationStep.EDITOR
                     },
                     onSelectFromDevice = {
-                        selectedVideoClip = "clip_selected_from_device.mp4"
-                        currentStep = ShortCreationStep.EDITOR
+                        uploadController.requestMedia(UploadTargetType.SHORTS) { item ->
+                            selectedVideoClip = item.uri.toString()
+                            if (title.isBlank()) title = item.fileName.substringBeforeLast('.')
+                            currentStep = ShortCreationStep.EDITOR
+                        }
                     }
                 )
             }
@@ -378,7 +391,9 @@ fun CreateShortScreen(
                     customLabel = customThumbnailLabel,
                     onSelectFrame = { selectedThumbnailFrameIndex = it },
                     onUploadCustom = {
-                        customThumbnailLabel = "Uploaded Image #${selectedThumbnailFrameIndex + 1}"
+                        uploadController.requestMedia(UploadTargetType.THUMBNAIL) { item ->
+                            customThumbnailLabel = item.fileName
+                        }
                     },
                     onNext = { currentStep = ShortCreationStep.POLICY }
                 )
@@ -391,6 +406,22 @@ fun CreateShortScreen(
                     onBack = { currentStep = ShortCreationStep.THUMBNAIL },
                     onAgreeAndUpload = {
                         currentStep = ShortCreationStep.UPLOAD_PROGRESS
+                        val taskId = UUID.randomUUID().toString()
+                        val task = UploadTask(
+                            id = taskId,
+                            targetType = UploadTargetType.SHORTS,
+                            title = title.ifBlank { "Shorts Video" },
+                            mediaUri = selectedVideoClip,
+                            mimeType = "video/mp4",
+                            fileSizeBytes = 1024 * 1024 * 5L,
+                            associatedContentId = contentEntity.id,
+                            channelId = channel?.channelId ?: user.id,
+                            channelName = channel?.name?.takeIf { it.isNotBlank() } ?: user.channelName.orEmpty(),
+                            visibility = visibility,
+                            audience = if (isMadeForKids) "MADE_FOR_KIDS" else "NOT_FOR_KIDS",
+                            tags = hashtags
+                        )
+                        uploadManager.enqueueUpload(task)
                         viewModel.startUpload(contentEntity)
                     }
                 )
@@ -458,6 +489,9 @@ fun CreateShortScreen(
             }
         )
     }
+
+    // Centralized Upload Host for Shorts & Thumbnails
+    CentralizedUploadHost(controller = uploadController)
 }
 
 // ----------------------------------------------------

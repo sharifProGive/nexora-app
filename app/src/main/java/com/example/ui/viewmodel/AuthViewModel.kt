@@ -93,6 +93,18 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
         _uiState.update { it.copy(successMessage = null) }
     }
 
+    private fun deriveDisplayNameFromEmail(email: String): String {
+        val local = email.substringBefore("@").trim()
+        val parts = local.split('.', '_', '-', '+')
+            .map { part -> part.filter { it.isLetter() } }
+            .filter { it.isNotBlank() }
+        return if (parts.isNotEmpty()) {
+            parts.joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+        } else {
+            ""
+        }
+    }
+
     // Google Sign-In Flow initiation
     fun startGoogleAuth(googleAccountName: String, googleEmail: String, onNavigateToSetup: () -> Unit) {
         _uiState.update {
@@ -130,11 +142,13 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
 
             val result = repository.sendVerificationCode(clean, "REGISTRATION")
             result.onSuccess { codeEntity ->
+                val derivedName = deriveDisplayNameFromEmail(clean)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         regProvider = "EMAIL",
                         regIdentifier = clean,
+                        regAccountName = derivedName,
                         verificationTarget = clean,
                         verificationType = "REGISTRATION",
                         plainVerificationCodePreview = codeEntity.plainCodePreview,
@@ -179,6 +193,7 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                         isLoading = false,
                         regProvider = "PHONE",
                         regIdentifier = clean,
+                        regAccountName = "", // Strictly blank for phone authentication
                         verificationTarget = clean,
                         verificationType = "REGISTRATION",
                         plainVerificationCodePreview = codeEntity.plainCodePreview,

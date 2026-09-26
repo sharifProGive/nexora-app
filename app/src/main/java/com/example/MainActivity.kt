@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -42,6 +43,7 @@ import com.example.ui.screens.VerificationCodeScreen
 import com.example.ui.screens.WelcomeScreen
 import com.example.ui.theme.NexoraTheme
 import com.example.ui.update.AdminUpdateDialog
+import com.example.ui.update.InAppUpdateDialog
 import com.example.ui.update.UpdateScreen
 import com.example.ui.update.UpdateViewModel
 import com.example.ui.update.UpdateViewModelFactory
@@ -52,6 +54,7 @@ import com.example.update.model.UpdateCheckResult
 import com.example.update.model.UpdateUrgency
 import com.example.update.repository.UpdateRepository
 import com.example.update.service.UpdateServiceFactory
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,14 +88,19 @@ class MainActivity : ComponentActivity() {
                 val isAdminAuthorized by updateViewModel.isAdminAuthorized.collectAsStateWithLifecycle()
 
                 var showAdminDialog by remember { mutableStateOf(false) }
+                var showUpdateDialog by remember { mutableStateOf(false) }
+                val coroutineScope = rememberCoroutineScope()
 
-                // Mandatory Update Interceptor: locks user out if a mandatory update is active
+                // Automatic In-App Update trigger when a newer release is detected
                 LaunchedEffect(updateCheckResult) {
                     val result = updateCheckResult
-                    if (result is UpdateCheckResult.UpdateAvailable && result.urgency == UpdateUrgency.MANDATORY) {
-                        val currentRoute = navController.currentBackStackEntry?.destination?.route
-                        if (currentRoute != "update_screen" && currentRoute != "splash") {
-                            navController.navigate("update_screen")
+                    if (result is UpdateCheckResult.UpdateAvailable) {
+                        showUpdateDialog = true
+                        if (result.urgency == UpdateUrgency.MANDATORY) {
+                            val currentRoute = navController.currentBackStackEntry?.destination?.route
+                            if (currentRoute != "update_screen" && currentRoute != "splash") {
+                                navController.navigate("update_screen")
+                            }
                         }
                     }
                 }
@@ -392,13 +400,19 @@ class MainActivity : ComponentActivity() {
                                         updateViewModel.checkForUpdates { result ->
                                             when (result) {
                                                 is UpdateCheckResult.UpdateAvailable -> {
-                                                    navController.navigate("update_screen")
+                                                    showUpdateDialog = true
                                                 }
                                                 is UpdateCheckResult.UpToDate -> {
-                                                    // Already handled or snackbar
+                                                    coroutineScope.launch {
+                                                        snackbarHostState.showSnackbar(
+                                                            "nexora is up to date (v${updateViewModel.getInstalledVersionName()})"
+                                                        )
+                                                    }
                                                 }
                                                 is UpdateCheckResult.Error -> {
-                                                    // Error handled in state
+                                                    coroutineScope.launch {
+                                                        snackbarHostState.showSnackbar(result.message)
+                                                    }
                                                 }
                                             }
                                         }
@@ -459,6 +473,27 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                    }
+
+                    // In-App Update Dialog (Material 3 popup for GitHub Releases)
+                    val currentUpdateResult = updateCheckResult
+                    if (showUpdateDialog && currentUpdateResult is UpdateCheckResult.UpdateAvailable) {
+                        InAppUpdateDialog(
+                            updateResult = currentUpdateResult,
+                            downloadState = downloadState,
+                            onUpdateNow = {
+                                updateViewModel.startDownload(currentUpdateResult.config)
+                            },
+                            onCancelDownload = {
+                                updateViewModel.cancelDownload()
+                            },
+                            onDismiss = {
+                                showUpdateDialog = false
+                            },
+                            onInstall = { activity ->
+                                updateViewModel.installUpdate(activity)
+                            }
+                        )
                     }
 
                     // Admin & Tester Simulation Dialog

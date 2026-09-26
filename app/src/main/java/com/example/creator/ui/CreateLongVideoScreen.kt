@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -62,10 +65,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.creator.model.UploadStatusStep
 import com.example.creator.viewmodel.CreatorViewModel
 import com.example.data.model.CreatorContentEntity
@@ -82,6 +88,13 @@ import com.example.ui.theme.NexoraSurfaceElevated
 import com.example.ui.theme.NexoraTextMuted
 import com.example.ui.theme.NexoraTextPrimary
 import com.example.ui.theme.NexoraTextSecondary
+import com.example.upload.model.MediaItem
+import com.example.upload.model.UploadStatus
+import com.example.upload.model.UploadTargetType
+import com.example.upload.model.UploadTask
+import com.example.upload.service.UploadManager
+import com.example.upload.ui.CentralizedUploadHost
+import com.example.upload.ui.rememberCentralizedUploadController
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,11 +103,25 @@ fun CreateLongVideoScreen(
     user: UserEntity,
     viewModel: CreatorViewModel,
     initialDraft: CreatorContentEntity? = null,
+    initialMediaItem: MediaItem? = null,
     onNavigateBack: () -> Unit,
     onPreviewVideo: (CreatorContentEntity) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val channel = uiState.channel
+
+    val context = LocalContext.current
+    val uploadManager = remember { UploadManager.getInstance(context) }
+    val uploadController = rememberCentralizedUploadController()
+    val allTasks by uploadManager.allTasks.collectAsState()
+
+    var selectedMediaItem by remember { mutableStateOf<MediaItem?>(initialMediaItem) }
+    var customThumbnailUri by remember { mutableStateOf<String?>(null) }
+    var activeTaskId by remember { mutableStateOf<String?>(null) }
+
+    val currentUploadTask = remember(allTasks, activeTaskId) {
+        allTasks.firstOrNull { it.id == activeTaskId }
+    }
 
     var title by remember { mutableStateOf(initialDraft?.title ?: "") }
     var description by remember { mutableStateOf(initialDraft?.description ?: "") }
@@ -223,7 +250,20 @@ fun CreateLongVideoScreen(
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (uiState.uploadStep == UploadStatusStep.COMPLETED) {
+                val isCompleted = (currentUploadTask?.status == UploadStatus.COMPLETED) || (uiState.uploadStep == UploadStatusStep.COMPLETED)
+                val isFailed = (currentUploadTask?.status == UploadStatus.FAILED) || (uiState.uploadStep == UploadStatusStep.FAILED)
+                val progress = currentUploadTask?.progressPercent ?: uiState.uploadProgressPercent
+                val statusText = if (currentUploadTask != null) {
+                    when (currentUploadTask.status) {
+                        UploadStatus.QUEUED -> "Queued for upload..."
+                        UploadStatus.UPLOADING -> "Uploading (${currentUploadTask.uploadSpeed})..."
+                        UploadStatus.PROCESSING -> "Processing video on nexora..."
+                        UploadStatus.COMPLETED -> "Published!"
+                        UploadStatus.FAILED, UploadStatus.CANCELLED -> "Upload failed"
+                    }
+                } else uiState.uploadStatusMessage
+
+                if (isCompleted) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
                             modifier = Modifier.size(72.dp).clip(CircleShape).background(NexoraSuccessGreen.copy(alpha = 0.2f)),
@@ -266,14 +306,19 @@ fun CreateLongVideoScreen(
                             }
                         }
                     }
-                } else if (uiState.uploadStep == UploadStatusStep.FAILED) {
+                } else if (isFailed) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.Error, contentDescription = null, tint = NexoraErrorRed, modifier = Modifier.size(60.dp))
                         Spacer(modifier = Modifier.height(14.dp))
                         Text("Upload failed.", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = NexoraTextPrimary)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(currentUploadTask?.errorMessage ?: "Connection error.", color = NexoraTextSecondary, fontSize = 12.sp)
                         Spacer(modifier = Modifier.height(20.dp))
                         Surface(
-                            onClick = { viewModel.retryFailedUpload() },
+                            onClick = {
+                                activeTaskId?.let { uploadManager.retryUpload(it) }
+                                viewModel.retryFailedUpload()
+                            },
                             shape = RoundedCornerShape(10.dp),
                             color = NexoraCyanAccent,
                             modifier = Modifier.fillMaxWidth(0.7f).height(44.dp)
@@ -285,16 +330,31 @@ fun CreateLongVideoScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = NexoraCyanAccent, strokeWidth = 4.dp, modifier = Modifier.size(60.dp))
                         Spacer(modifier = Modifier.height(20.dp))
-                        Text(uiState.uploadStatusMessage, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = NexoraTextPrimary)
+                        Text(statusText, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = NexoraTextPrimary)
+                        if (currentUploadTask != null && currentUploadTask.uploadSpeed.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(currentUploadTask.uploadSpeed, color = NexoraCyanAccent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
                         Spacer(modifier = Modifier.height(14.dp))
                         LinearProgressIndicator(
-                            progress = { uiState.uploadProgressPercent / 100f },
+                            progress = { progress / 100f },
                             modifier = Modifier.fillMaxWidth(0.8f).height(8.dp).clip(RoundedCornerShape(4.dp)),
                             color = NexoraCyanAccent,
                             trackColor = NexoraSurfaceElevated
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("${uiState.uploadProgressPercent}%", color = NexoraCyanAccent, fontWeight = FontWeight.Bold)
+                        Text("$progress%", color = NexoraCyanAccent, fontWeight = FontWeight.Bold)
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        OutlinedButton(
+                            onClick = { uploadController.openUploadManager() },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = NexoraTextPrimary)
+                        ) {
+                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Open Upload Manager", fontSize = 12.sp)
+                        }
                     }
                 }
             }
@@ -317,14 +377,50 @@ fun CreateLongVideoScreen(
                                 listOf(Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF312E81))
                             )
                         )
-                        .border(1.dp, NexoraSurfaceBorder, RoundedCornerShape(14.dp)),
+                        .border(1.dp, NexoraSurfaceBorder, RoundedCornerShape(14.dp))
+                        .clickable {
+                            uploadController.requestMedia(UploadTargetType.LONG_VIDEO) { item ->
+                                selectedMediaItem = item
+                                if (title.isBlank()) {
+                                    title = item.fileName.substringBeforeLast('.')
+                                }
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.VideoFile, contentDescription = null, tint = NexoraCyanAccent, modifier = Modifier.size(36.dp))
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("Selected: 1080p Landscape Video (03:00)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text("Thumbnail: Frame #${selectedThumbnailIndex + 1}", color = NexoraTextSecondary, fontSize = 10.sp)
+                    if (selectedMediaItem != null) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
+                            Icon(Icons.Default.VideoFile, contentDescription = null, tint = NexoraCyanAccent, modifier = Modifier.size(36.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = selectedMediaItem!!.fileName,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${selectedMediaItem!!.formattedSize} • ${if (selectedMediaItem!!.formattedDuration.isNotBlank()) selectedMediaItem!!.formattedDuration else "Standard Duration"}${if (selectedMediaItem!!.formattedResolution.isNotBlank()) " • " + selectedMediaItem!!.formattedResolution else ""}",
+                                color = NexoraCyanAccent,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color.Black.copy(alpha = 0.6f)
+                            ) {
+                                Text("Tap to change video", color = NexoraTextSecondary, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                            }
+                        }
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
+                            Icon(Icons.Default.Upload, contentDescription = null, tint = NexoraCyanAccent, modifier = Modifier.size(40.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Select Video to Upload", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("Record Video, Choose Video, or Pick File", color = NexoraTextSecondary, fontSize = 11.sp)
+                        }
                     }
                 }
 
@@ -393,15 +489,40 @@ fun CreateLongVideoScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     (0..2).forEach { idx ->
                         Surface(
-                            onClick = { selectedThumbnailIndex = idx },
+                            onClick = {
+                                selectedThumbnailIndex = idx
+                                customThumbnailUri = null
+                            },
                             shape = RoundedCornerShape(8.dp),
-                            color = if (selectedThumbnailIndex == idx) NexoraCyanAccent.copy(alpha = 0.2f) else NexoraSurfaceDark,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedThumbnailIndex == idx) NexoraCyanAccent else NexoraSurfaceBorder),
+                            color = if (customThumbnailUri == null && selectedThumbnailIndex == idx) NexoraCyanAccent.copy(alpha = 0.2f) else NexoraSurfaceDark,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (customThumbnailUri == null && selectedThumbnailIndex == idx) NexoraCyanAccent else NexoraSurfaceBorder),
                             modifier = Modifier.weight(1f).height(44.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text("Frame ${idx + 1}", fontSize = 12.sp, color = NexoraTextPrimary, fontWeight = FontWeight.SemiBold)
                             }
+                        }
+                    }
+
+                    // Custom Thumbnail option with Centralized Upload
+                    Surface(
+                        onClick = {
+                            uploadController.requestMedia(UploadTargetType.THUMBNAIL) { item ->
+                                customThumbnailUri = item.uri.toString()
+                            }
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (customThumbnailUri != null) NexoraCyanAccent.copy(alpha = 0.25f) else NexoraSurfaceElevated,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (customThumbnailUri != null) NexoraCyanAccent else NexoraSurfaceBorder),
+                        modifier = Modifier.weight(1.3f).height(44.dp).testTag("btn_custom_thumbnail")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = if (customThumbnailUri != null) "✓ Custom" else "+ Custom",
+                                fontSize = 11.sp,
+                                color = if (customThumbnailUri != null) NexoraCyanAccent else NexoraTextPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -561,7 +682,7 @@ fun CreateLongVideoScreen(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "By uploading this content, you confirm that you have the necessary rights to upload it and agree to follow NEXORA's Privacy Policy, Community Guidelines, and Content Policies.",
+                            text = "By uploading this content, you confirm that you have the necessary rights to upload it and agree to follow nexora's Privacy Policy, Community Guidelines, and Content Policies.",
                             fontSize = 12.sp,
                             color = NexoraTextSecondary
                         )
@@ -587,8 +708,38 @@ fun CreateLongVideoScreen(
                 Surface(
                     onClick = {
                         if (policyAgreed) {
+                            val contentId = UUID.randomUUID().toString()
+                            val uploadContent = contentEntity.copy(
+                                id = contentId,
+                                videoPath = selectedMediaItem?.uri?.toString() ?: "video_upload.mp4",
+                                thumbnailUri = customThumbnailUri ?: "thumb_landscape_$selectedThumbnailIndex.jpg",
+                                status = "UPLOADING",
+                                uploadProgress = 0,
+                                durationSeconds = (selectedMediaItem?.durationMs?.div(1000))?.toInt() ?: 180
+                            )
+                            viewModel.startUpload(uploadContent)
+
+                            val taskId = UUID.randomUUID().toString()
+                            val task = UploadTask(
+                                id = taskId,
+                                targetType = UploadTargetType.LONG_VIDEO,
+                                title = title.ifBlank { "Untitled Video" },
+                                mediaUri = selectedMediaItem?.uri?.toString() ?: "",
+                                thumbnailUri = customThumbnailUri,
+                                mimeType = selectedMediaItem?.mimeType ?: "video/mp4",
+                                fileSizeBytes = selectedMediaItem?.fileSizeBytes ?: 1024 * 1024 * 10L,
+                                associatedContentId = contentId,
+                                channelId = channel?.channelId ?: user.id,
+                                channelName = channel?.name?.takeIf { it.isNotBlank() } ?: user.channelName.orEmpty(),
+                                description = description,
+                                visibility = visibility,
+                                audience = if (isMadeForKids) "MADE_FOR_KIDS" else "NOT_FOR_KIDS",
+                                category = category,
+                                tags = hashtags
+                            )
+                            activeTaskId = taskId
+                            uploadManager.enqueueUpload(task)
                             isUploading = true
-                            viewModel.startUpload(contentEntity)
                         }
                     },
                     shape = RoundedCornerShape(12.dp),
@@ -633,4 +784,7 @@ fun CreateLongVideoScreen(
             }
         )
     }
+
+    // Centralized Upload Host for Video & Custom Thumbnail
+    CentralizedUploadHost(controller = uploadController)
 }

@@ -60,7 +60,7 @@ object SecurityUtils {
         return digits.length in 8..15
     }
 
-    fun formatHandle(input: String, preserveCase: Boolean = false): String {
+    fun formatHandle(input: String, preserveCase: Boolean = true): String {
         var clean = input.trim()
         if (!clean.startsWith("@")) {
             clean = "@$clean"

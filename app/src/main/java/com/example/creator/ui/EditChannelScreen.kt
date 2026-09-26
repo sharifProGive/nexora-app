@@ -62,10 +62,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.creator.model.ChannelSocialLink
 import com.example.creator.model.SocialLinksJsonHelper
 import com.example.creator.viewmodel.CreatorViewModel
@@ -83,6 +86,12 @@ import com.example.ui.theme.NexoraTextMuted
 import com.example.ui.theme.NexoraTextPrimary
 import com.example.ui.theme.NexoraTextSecondary
 import com.example.ui.theme.NexoraVioletAccent
+import com.example.upload.model.UploadTargetType
+import com.example.upload.model.UploadTask
+import com.example.upload.service.UploadManager
+import com.example.upload.ui.CentralizedUploadHost
+import com.example.upload.ui.rememberCentralizedUploadController
+import java.util.UUID
 
 private val BANNER_GRADIENTS = listOf(
     listOf(Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF4C1D95), Color(0xFF06B6D4)), // Cyber Dark
@@ -118,9 +127,15 @@ fun EditChannelScreen(
     val uiState by viewModel.uiState.collectAsState()
     val channel = uiState.channel
 
+    val context = LocalContext.current
+    val uploadManager = remember { UploadManager.getInstance(context) }
+    val uploadController = rememberCentralizedUploadController()
+
     var name by remember(channel) { mutableStateOf(channel?.name ?: "") }
     var handle by remember(channel) { mutableStateOf(channel?.handle ?: "") }
     var description by remember(channel) { mutableStateOf(channel?.description ?: "") }
+    var bannerUri by remember(channel) { mutableStateOf(channel?.bannerUri) }
+    var profilePictureUri by remember(channel) { mutableStateOf(channel?.profilePictureUri) }
     var avatarColorHex by remember(channel) { mutableStateOf(channel?.avatarColorHex ?: "#06B6D4") }
     var bannerGradientIndex by remember(channel) { mutableIntStateOf(channel?.bannerGradientIndex ?: 0) }
     var category by remember(channel) { mutableStateOf(channel?.category ?: "Gaming") }
@@ -209,8 +224,8 @@ fun EditChannelScreen(
                         name = name,
                         handle = handle,
                         description = description,
-                        profilePicUri = channel?.profilePictureUri,
-                        bannerUri = channel?.bannerUri,
+                        profilePicUri = profilePictureUri,
+                        bannerUri = bannerUri,
                         avatarColorHex = avatarColorHex,
                         bannerGradientIndex = bannerGradientIndex,
                         category = category,
@@ -266,19 +281,28 @@ fun EditChannelScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(110.dp)
+                    .height(120.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Brush.horizontalGradient(currentGradient))
                     .border(1.dp, NexoraSurfaceBorder, RoundedCornerShape(12.dp))
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    for (i in 0..12) {
-                        drawLine(
-                            color = Color.White.copy(alpha = 0.05f),
-                            start = Offset(i * 35f, 0f),
-                            end = Offset(i * 35f + 50f, size.height),
-                            strokeWidth = 2f
-                        )
+                if (!bannerUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = bannerUri,
+                        contentDescription = "Channel Banner",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        for (i in 0..12) {
+                            drawLine(
+                                color = Color.White.copy(alpha = 0.05f),
+                                start = Offset(i * 35f, 0f),
+                                end = Offset(i * 35f + 50f, size.height),
+                                strokeWidth = 2f
+                            )
+                        }
                     }
                 }
 
@@ -289,23 +313,39 @@ fun EditChannelScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Surface(
-                        onClick = { showBannerPicker = true },
+                        onClick = {
+                            uploadController.requestMedia(UploadTargetType.CHANNEL_BANNER) { mediaItem ->
+                                bannerUri = mediaItem.uri.toString()
+                                val task = UploadTask(
+                                    id = UUID.randomUUID().toString(),
+                                    targetType = UploadTargetType.CHANNEL_BANNER,
+                                    title = "Channel Banner",
+                                    mediaUri = mediaItem.uri.toString(),
+                                    mimeType = mediaItem.mimeType,
+                                    fileSizeBytes = mediaItem.fileSizeBytes
+                                )
+                                uploadManager.enqueueUpload(task)
+                            }
+                        },
                         shape = RoundedCornerShape(8.dp),
-                        color = Color.Black.copy(alpha = 0.65f),
+                        color = Color.Black.copy(alpha = 0.75f),
                         modifier = Modifier.testTag("btn_change_banner")
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {
-                            Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, tint = NexoraCyanAccent, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Change Banner", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
 
                     Surface(
-                        onClick = { bannerGradientIndex = 1 },
+                        onClick = {
+                            bannerUri = null
+                            bannerGradientIndex = 1
+                        },
                         shape = RoundedCornerShape(8.dp),
                         color = Color.Black.copy(alpha = 0.65f),
                         modifier = Modifier.testTag("btn_remove_banner")
@@ -345,18 +385,56 @@ fun EditChannelScreen(
                         .border(2.dp, NexoraSurfaceBorder, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (name.isNotBlank()) name.first().toString().uppercase() else "C",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.Black
-                    )
+                    if (!profilePictureUri.isNullOrBlank()) {
+                        AsyncImage(
+                            model = profilePictureUri,
+                            contentDescription = name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Text(
+                            text = if (name.isNotBlank()) name.first().toString().uppercase() else "C",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.Black
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Surface(
+                            onClick = {
+                                uploadController.requestMedia(UploadTargetType.CHANNEL_PICTURE) { mediaItem ->
+                                    profilePictureUri = mediaItem.uri.toString()
+                                    val task = UploadTask(
+                                        id = UUID.randomUUID().toString(),
+                                        targetType = UploadTargetType.CHANNEL_PICTURE,
+                                        title = "Channel Profile Picture",
+                                        mediaUri = mediaItem.uri.toString(),
+                                        mimeType = mediaItem.mimeType,
+                                        fileSizeBytes = mediaItem.fileSizeBytes
+                                    )
+                                    uploadManager.enqueueUpload(task)
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = NexoraCyanAccent.copy(alpha = 0.15f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, NexoraCyanAccent),
+                            modifier = Modifier.testTag("btn_upload_channel_picture")
+                        ) {
+                            Text(
+                                text = "Upload Photo",
+                                color = NexoraCyanAccent,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                            )
+                        }
+
                         Surface(
                             onClick = { showAvatarPicker = true },
                             shape = RoundedCornerShape(8.dp),
@@ -365,7 +443,7 @@ fun EditChannelScreen(
                             modifier = Modifier.testTag("btn_change_profile_picture")
                         ) {
                             Text(
-                                text = "Change Color / Icon",
+                                text = "Color / Icon",
                                 color = NexoraTextPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -374,7 +452,10 @@ fun EditChannelScreen(
                         }
 
                         Surface(
-                            onClick = { avatarColorHex = "#06B6D4" },
+                            onClick = {
+                                profilePictureUri = null
+                                avatarColorHex = "#06B6D4"
+                            },
                             shape = RoundedCornerShape(8.dp),
                             color = NexoraSurfaceDark,
                             border = androidx.compose.foundation.BorderStroke(1.dp, NexoraSurfaceBorder),
@@ -390,7 +471,7 @@ fun EditChannelScreen(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Shown on your channel page and videos.",
+                        text = "Shown on your channel page, video player, and comments.",
                         style = MaterialTheme.typography.labelSmall,
                         color = NexoraTextMuted
                     )
@@ -765,8 +846,8 @@ fun EditChannelScreen(
                             name = name,
                             handle = handle,
                             description = description,
-                            profilePicUri = channel?.profilePictureUri,
-                            bannerUri = channel?.bannerUri,
+                            profilePicUri = profilePictureUri,
+                            bannerUri = bannerUri,
                             avatarColorHex = avatarColorHex,
                             bannerGradientIndex = bannerGradientIndex,
                             category = category,
@@ -943,6 +1024,9 @@ fun EditChannelScreen(
             }
         )
     }
+
+    // Centralized Upload Host for Channel Picture & Banner
+    CentralizedUploadHost(controller = uploadController)
 }
 
 @Composable

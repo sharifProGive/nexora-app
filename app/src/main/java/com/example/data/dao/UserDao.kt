@@ -46,6 +46,9 @@ interface UserDao {
     @Query("UPDATE users SET name = :name, bio = :bio, avatarIndex = :avatarIndex WHERE id = :userId")
     suspend fun updateProfile(userId: String, name: String, bio: String, avatarIndex: Int)
 
+    @Query("UPDATE users SET profilePictureUri = :uri WHERE id = :userId")
+    suspend fun updateProfilePicture(userId: String, uri: String?)
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertUser(user: UserEntity)
 

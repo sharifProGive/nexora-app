@@ -99,7 +99,7 @@ fun EmailAuthScreen(
                         localError = null
                     },
                     label = "Email Address",
-                    placeholder = "e.g. name@example.com",
+                    placeholder = "Enter your email address",
                     leadingIcon = Icons.Default.Email,
                     keyboardType = KeyboardType.Email,
                     isError = (errorMessage != null || localError != null),
@@ -136,7 +136,7 @@ fun EmailAuthScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "NEXORA will never ask for your email account password. Your NEXORA password is set separately later.",
+                            text = "nexora will never ask for your email account password. Your nexora password is set separately later.",
                             style = MaterialTheme.typography.labelSmall,
                             color = NexoraTextSecondary
                         )

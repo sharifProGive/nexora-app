@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "NEXORA"
+rootProject.name = "nexora"
 
 include(":app")

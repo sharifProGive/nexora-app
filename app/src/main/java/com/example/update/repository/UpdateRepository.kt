@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import com.example.update.github.GitHubReleaseClient
+import com.example.update.github.GitHubReleaseResult
 import com.example.update.model.RemoteVersionConfig
 import com.example.update.model.UpdateCheckResult
 import com.example.update.model.UpdateUrgency
@@ -11,7 +13,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-class UpdateRepository(private val context: Context) {
+class UpdateRepository(
+    private val context: Context,
+    private val gitHubReleaseClient: GitHubReleaseClient = GitHubReleaseClient()
+) {
 
     // Default simulation state: UP_TO_DATE initially, but can be switched via admin panel or remote
     private var activeScenario: AdminSimulationScenario = AdminSimulationScenario.UP_TO_DATE
@@ -62,17 +67,54 @@ class UpdateRepository(private val context: Context) {
     }
 
     /**
-     * Fetches current remote version configuration.
-     * Can fetch from remote REST API or use currently active scenario.
+     * Fetches current remote version configuration from GitHub Releases API
+     * (https://api.github.com/repos/sharifProGive/nexora-app/releases/latest)
+     * with fallback to developer simulation scenarios if explicitly configured.
      */
     suspend fun fetchRemoteConfig(): RemoteVersionConfig = withContext(Dispatchers.IO) {
         if (activeScenario == AdminSimulationScenario.SIMULATE_NETWORK_FAILURE) {
             throw java.io.IOException("Remote configuration endpoint unreachable (Simulated Network Failure).")
         }
 
-        val config = activeScenario.toRemoteConfig()
-        cachedConfig = config
-        config
+        // 1. If tester/developer chose an active simulation scenario other than UP_TO_DATE, honor it
+        if (activeScenario != AdminSimulationScenario.UP_TO_DATE) {
+            val config = activeScenario.toRemoteConfig()
+            cachedConfig = config
+            return@withContext config
+        }
+
+        // 2. Fetch live latest release from GitHub API
+        val installedName = getInstalledVersionName()
+        val installedCode = getInstalledVersionCode()
+
+        when (val ghResult = gitHubReleaseClient.fetchLatestRelease("sharifProGive", "nexora-app")) {
+            is GitHubReleaseResult.Success -> {
+                val config = gitHubReleaseClient.toRemoteVersionConfig(
+                    release = ghResult.release,
+                    installedVersionName = installedName,
+                    installedVersionCode = installedCode
+                )
+                cachedConfig = config
+                config
+            }
+            is GitHubReleaseResult.NoReleasesFound -> {
+                // If repository has no releases yet, consider app up-to-date with current version
+                val config = RemoteVersionConfig.defaultProduction().copy(
+                    latestVersion = installedName,
+                    latestVersionCode = installedCode
+                )
+                cachedConfig = config
+                config
+            }
+            is GitHubReleaseResult.Error -> {
+                // Return cached config or current version so app functions smoothly
+                val config = cachedConfig ?: RemoteVersionConfig.defaultProduction().copy(
+                    latestVersion = installedName,
+                    latestVersionCode = installedCode
+                )
+                config
+            }
+        }
     }
 
     /**
@@ -84,7 +126,11 @@ class UpdateRepository(private val context: Context) {
             val installedCode = getInstalledVersionCode()
             val installedName = getInstalledVersionName()
 
-            if (config.hasNewerVersion(installedCode)) {
+            // Compare version using semantic versioning and version code
+            val isSemVerNewer = SemVerUtil.compare(config.latestVersion, installedName) > 0
+            val isCodeNewer = config.hasNewerVersion(installedCode)
+
+            if (isSemVerNewer || isCodeNewer) {
                 val urgency = if (config.isMandatoryFor(installedCode)) {
                     UpdateUrgency.MANDATORY
                 } else {
@@ -106,7 +152,7 @@ class UpdateRepository(private val context: Context) {
             }
         } catch (e: Exception) {
             UpdateCheckResult.Error(
-                message = e.localizedMessage ?: "Failed to verify NEXORA version status.",
+                message = e.localizedMessage ?: "Failed to verify nexora version status.",
                 cachedConfig = cachedConfig
             )
         }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartDisplay
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -48,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,14 +60,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.data.model.UserEntity
 import com.example.security.SecurityUtils
 import com.example.ui.components.NexoraTextField
 import com.example.ui.theme.NexoraTheme
+import com.example.upload.model.UploadTargetType
+import com.example.upload.model.UploadTask
+import com.example.upload.service.UploadManager
+import com.example.upload.ui.CentralizedUploadHost
+import com.example.upload.ui.rememberCentralizedUploadController
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +98,11 @@ fun YouProfileScreen(
     onOpenFriendsChat: () -> Unit = {},
     onOpenEditChannel: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val uploadManager = remember { UploadManager.getInstance(context) }
+    val activeUploads by uploadManager.activeTasks.collectAsState()
+    val uploadController = rememberCentralizedUploadController()
+
     var selectedProfileTab by remember { mutableIntStateOf(0) }
     var showCreateChannelDialog by remember { mutableStateOf(false) }
     var showEditProfileSheet by remember { mutableStateOf(false) }
@@ -107,7 +124,7 @@ fun YouProfileScreen(
             .fillMaxSize()
             .background(colors.background)
     ) {
-        // Top App Bar: Compact & Clean "YOU    ⚙️"
+        // Top App Bar: Compact & Clean "You" + Upload Manager + Settings
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -125,19 +142,49 @@ fun YouProfileScreen(
                 color = colors.textPrimary
             )
 
-            // Dedicated, clearly tappable Settings Gear icon
-            IconButton(
-                onClick = onOpenSettings,
-                modifier = Modifier
-                    .testTag("btn_top_settings")
-                    .size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = colors.textPrimary,
-                    modifier = Modifier.size(24.dp)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Upload Manager access icon
+                IconButton(
+                    onClick = { uploadController.openUploadManager() },
+                    modifier = Modifier
+                        .testTag("btn_top_upload_manager")
+                        .size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Upload,
+                            contentDescription = "Upload Manager",
+                            tint = if (activeUploads.isNotEmpty()) colors.accent else colors.textPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        if (activeUploads.isNotEmpty()) {
+                            Surface(
+                                shape = CircleShape,
+                                color = colors.accent,
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .align(Alignment.TopEnd)
+                            ) {}
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Dedicated, clearly tappable Settings Gear icon
+                IconButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier
+                        .testTag("btn_top_settings")
+                        .size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
 
@@ -162,21 +209,61 @@ fun YouProfileScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Profile Avatar
+                        // Profile Avatar with Centralized Upload Change Picture trigger
                         Box(
                             modifier = Modifier
-                                .size(56.dp)
+                                .size(60.dp)
                                 .clip(CircleShape)
                                 .background(avatarColor)
-                                .border(1.5.dp, colors.surfaceBorder, CircleShape),
+                                .border(1.5.dp, colors.surfaceBorder, CircleShape)
+                                .clickable {
+                                    uploadController.requestMedia(UploadTargetType.PROFILE_PICTURE) { mediaItem ->
+                                        val task = UploadTask(
+                                            id = UUID.randomUUID().toString(),
+                                            targetType = UploadTargetType.PROFILE_PICTURE,
+                                            title = "Personal Profile Picture",
+                                            mediaUri = mediaItem.uri.toString(),
+                                            mimeType = mediaItem.mimeType,
+                                            fileSizeBytes = mediaItem.fileSizeBytes
+                                        )
+                                        uploadManager.enqueueUpload(task)
+                                    }
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = user.name.firstOrNull()?.toString()?.uppercase() ?: "U",
-                                fontWeight = FontWeight.Black,
-                                fontSize = 22.sp,
-                                color = Color.White
-                            )
+                            if (!user.profilePictureUri.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = user.profilePictureUri,
+                                    contentDescription = user.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Text(
+                                    text = user.name.firstOrNull()?.toString()?.uppercase() ?: "U",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 24.sp,
+                                    color = Color.White
+                                )
+                            }
+
+                            // Small camera icon indicator at bottom
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .align(Alignment.BottomEnd)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.65f))
+                                    .border(1.dp, colors.accent, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = "Change Picture",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(12.dp))
@@ -230,7 +317,7 @@ fun YouProfileScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = user.bio.ifBlank { "Member of the NEXORA community." },
+                        text = user.bio.ifBlank { "Member of the nexora community." },
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                         color = colors.textSecondary,
                         maxLines = 2
@@ -947,4 +1034,7 @@ fun YouProfileScreen(
             }
         }
     }
+
+    // Centralized Upload Host for Profile Picture & Media transfers
+    CentralizedUploadHost(controller = uploadController)
 }

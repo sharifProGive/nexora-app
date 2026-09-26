@@ -19,28 +19,7 @@ class AuthRepository(private val database: NexoraDatabase) {
     private val sessionDao = database.sessionDao()
 
     suspend fun initSeedDataIfNeeded() = withContext(Dispatchers.IO) {
-        val count = userDao.getUserCount()
-        if (count == 0) {
-            // Seed a sample reserved account for collision testing (e.g., @sharif as mentioned in prompt)
-            val salt = SecurityUtils.generateSalt()
-            val hash = SecurityUtils.hashPassword("Nexora2026!", salt)
-            val demoUser = UserEntity(
-                id = UUID.randomUUID().toString(),
-                authProvider = "EMAIL",
-                identifier = "sharif.sample@nexora.io",
-                email = "sharif.sample@nexora.io",
-                name = "Sharif",
-                handle = "@sharif",
-                passwordHash = hash,
-                passwordSalt = salt,
-                bio = "Digital explorer & creator building on NEXORA.",
-                avatarIndex = 1,
-                avatarColorHex = "#6366F1",
-                createdAt = System.currentTimeMillis() - 86400000L * 7,
-                isVerified = true
-            )
-            userDao.insertUser(demoUser)
-        }
+        // Clean initialization without hardcoded mock users
     }
 
     suspend fun getActiveUser(): UserEntity? = withContext(Dispatchers.IO) {

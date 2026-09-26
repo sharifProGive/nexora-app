@@ -27,6 +27,7 @@ data class UserEntity(
     val bio: String = "",
     val avatarIndex: Int = 0,
     val avatarColorHex: String = "#6366F1",
+    val profilePictureUri: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val isVerified: Boolean = true,
     // Profile Privacy (Step 1A)

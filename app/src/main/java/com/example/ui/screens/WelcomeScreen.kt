@@ -86,7 +86,7 @@ fun WelcomeScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "Welcome to NEXORA",
+                    text = "Welcome to nexora",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.5.sp
@@ -126,7 +126,7 @@ fun WelcomeScreen(
                 // 1. Continue with Google
                 AuthMethodCard(
                     title = "Continue with Google",
-                    subtitle = "Fast OIDC auth & separate NEXORA password",
+                    subtitle = "Fast OIDC auth & separate nexora password",
                     accentColor = Color(0xFF4285F4),
                     iconContent = {
                         Box(
@@ -196,7 +196,7 @@ fun WelcomeScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Already have a NEXORA account? ",
+                        text = "Already have a nexora account? ",
                         style = MaterialTheme.typography.bodyMedium,
                         color = NexoraTextSecondary
                     )

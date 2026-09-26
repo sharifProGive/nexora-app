@@ -99,7 +99,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "NEXORA",
+                        text = "nexora",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Black,
                             letterSpacing = 2.sp
@@ -165,7 +165,7 @@ fun HomeScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = user?.name ?: "Sharif",
+                                    text = user?.name ?: "Personal Profile",
                                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                     color = NexoraTextPrimary
                                 )
@@ -179,7 +179,7 @@ fun HomeScreen(
                             }
 
                             Text(
-                                text = user?.handle ?: "@sharif",
+                                text = user?.handle ?: "",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                 color = NexoraIndigoLight
                             )
@@ -317,7 +317,7 @@ fun HomeScreen(
                                 color = NexoraTextMuted
                             )
                             Text(
-                                text = "${user?.name ?: "Sharif"}  •  ${user?.handle ?: "@sharif"}",
+                                text = "${user?.name ?: "Personal Profile"}${if (!user?.handle.isNullOrBlank()) "  •  ${user.handle}" else ""}",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                 color = NexoraTextPrimary
                             )
